@@ -3,16 +3,21 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras import Model
 from tensorflow.keras.optimizers import Adam
+from collections import deque
 
 #util https://keras.io/examples/rl/ddpg_pendulum/
 
-class Networks:
+class DPPGNetworks:
     def __init__(self, action_space):
         self.action_space = action_space
+        self.buffer_size  = 10000
+        self.memoryBuffer = deque(maxlen = self.buffer_size)
         self.actor          = None
         self.critic         = None
         self.target_actor   = None
         self.target_critic  = None
+
+
 
     def create_actor(self, state_shape, name):
         input = layers.Input(shape = state_shape)
@@ -62,6 +67,24 @@ class Networks:
         # ONLY at initialization set the same weights for the target networks
         self.target_actor.set_weights(self.actor.get_weights())
         self.target_critic.set_weights(self.target_critic.get_weights())
+
+    def get_action(self, state):
+        pass
+
+    def add_to_buffer(self, state, action, reward, new_state):
+        self.memoryBuffer.append((state, action, reward, new_state))
+
+    def train(self):
+        pass
+    
+    def preprocess(self, state):
+        #preprocess the image from RGB to grayscale
+        # crop it.. etc
+        #return state
+        pass
+
+    def save_best_solution(self, path = 'bestSolution/'):
+        pass
 
 
 
