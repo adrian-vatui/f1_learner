@@ -119,7 +119,7 @@ class DPPGNetworks:
         pass
 
     def save_best_solution(self, path = 'bestSolution/'):
-        pass
+        self.basic_model.save(path + 'basic_model.h5')
 
 
 
