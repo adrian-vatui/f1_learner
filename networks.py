@@ -1,31 +1,39 @@
-import numpy as np
-from numpy.random.mtrand import random
-import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.keras import Model
-from tensorflow.keras.optimizers import Adam
+import random
 from collections import deque
-from tensorflow.python.keras.backend import softmax
 
-from tensorflow.python.keras.layers.pooling import MaxPool2D, MaxPooling2D
+import numpy as np
+from keras.optimizers import Adam
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from keras.models import Sequential
 
-#util https://keras.io/examples/rl/ddpg_pendulum/
 
-class DPPGNetworks:
-    def __init__(self, action_space):
+# util https://keras.io/examples/rl/ddpg_pendulum/
+
+
+class BasicNetwork:
+    def __init__(
+            self,
+            action_space=np.array([(0, 0, 0), (-1, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 0.8)]),
+            buffer_size=100,
+            gamma=0.95,
+            epsilon=1.0,
+            epsilon_min=0.1,
+            epsilon_decay=0.9999,
+            learning_rate=0.001,
+            batch_size=64
+    ):
         self.action_space = action_space
-        self.buffer_size  = 10000
-        self.memoryBuffer = deque(maxlen = self.buffer_size)
-        # self.actor          = None
-        # self.critic         = None
-        # self.target_actor   = None
-        # self.target_critic  = None
+        self.buffer_size = buffer_size
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
 
-        self.basic_model = None
-        self.epsilon = 1.0
+        self.memory_buffer = deque(maxlen=self.buffer_size)
+        self.model = None
 
-
-    
     # def create_actor(self, state_shape, name):
     #     input = layers.Input(shape = state_shape)
     #     #analyze the input state(the image) using a convolutional neural network
@@ -44,22 +52,32 @@ class DPPGNetworks:
     #     model = Model(inputs = input, outputs=y, name=name)
     #     return model
 
-    def create_basic_model(self, state_shape):
-        input = layers.Input(shape = state_shape)
-        x = input
-        x = layers.Conv2D(16, kernel_size=(5,5), strides=(4,4), activation='relu', use_bias=False, padding="valid")(x)
-        x = layers.MaxPooling2D(pool_size=(2,2))(x)
-        x = layers.Conv2D(32, kernel_size=(5,5), strides=(4,4), activation='relu', use_bias=False, padding="valid")(x)
-        x = layers.MaxPooling2D(pool_size=(2,2))(x)
-        
-        x = layers.Flatten()(x)
-        x = layers.Dense(64, activation='relu')(x)
-        y = layers.Dense(self.action_space.shape[0], activation='softmax')(x)
-        
-        model = Model(inputs = input, outputs = y)
+    def build_model(self, state_shape):
+        model = Sequential()
+        model.add(Conv2D(filters=6, kernel_size=(7, 7), strides=(3, 3), activation='relu', input_shape=state_shape))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Conv2D(filters=12, kernel_size=(4, 4), strides=(1, 1), activation='relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Flatten())
+        model.add(Dense(216, activation='relu'))
+        model.add(Dense(len(self.action_space), activation=None))
+        model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss="mean_squared_error")
         return model
 
-
+        # input = layers.Input(shape=state_shape)
+        # x = input
+        # x = layers.Conv2D(filters=16, kernel_size=(5, 5), strides=(4, 4), activation='relu')(x)
+        # x = layers.MaxPooling2D(pool_size=(2, 2))(x)
+        # x = layers.Conv2D(filters=32, kernel_size=(5, 5), strides=(4, 4), activation='relu')(x)
+        # x = layers.MaxPooling2D(pool_size=(2, 2))(x)
+        #
+        # x = layers.Flatten()(x)
+        # x = layers.Dense(64, activation='relu')(x)
+        # y = layers.Dense(len(self.action_space), activation=None)(x)
+        #
+        # model = Model(inputs=input, outputs=y)
+        # model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss="mean_squared_error")
+        # return model
 
     # def create_critic(self, state_shape, name):
     #     input = layers.Input(shape = state_shape)
@@ -92,55 +110,46 @@ class DPPGNetworks:
     #     self.target_actor.set_weights(self.actor.get_weights())
     #     self.target_critic.set_weights(self.target_critic.get_weights())
 
-    
-
-
     def get_action(self, state):
-        if self.basic_model == None:
-            self.basic_model = self.create_basic_model(state.shape)
-        
+        if self.model is None:
+            self.model = self.build_model(state.shape)
+
         if np.random.rand() < self.epsilon:
-            action_index = np.random.randint(0,len(self.action_space))
+            action_index = np.random.randint(0, len(self.action_space))
         else:
-            network_output = self.basic_model.predict(state)
+            network_output = self.model.predict(state)
             action_index = np.argmax(network_output)
-        
+
+        return self.action_space[action_index]
 
     def add_to_buffer(self, state, action, reward, new_state):
-        self.memoryBuffer.append((state, action, reward, new_state))
+        self.memory_buffer.append((state, action, reward, new_state))
 
     def train(self):
-        pass
-    
-    def preprocess(self, state):
-        #crop the image (Remove the bar below and 6 pixels from each margin)
-        state = state[:-12,6:-6]
+        if len(self.memory_buffer) < self.buffer_size:
+            # not enough data to train yet, so we do nothing
+            return
 
-        # make the color of the car black
-        car_position = state[66:79, 36:47]
-        car_position[car_position == 204] = 0
+        batch = random.sample(self.memory_buffer, self.batch_size)
+        states, targets = [], []
+        for state, action, reward, new_state in batch:
+            # feed-forward the current state
+            target = self.model.predict(np.expand_dims(state, axis=0))[0]
 
-        #set the same color for the grass
-        state = np.where(state == (102, 229, 102),(102, 204, 102), state)
+            # get maximum Q-value for the next state
+            next_q = np.amax(self.model.predict(np.expand_dims(new_state, axis=0))[0])
 
-        # convert to grayscale
-        np.dot(state[...,:3], [0.2989, 0.5870, 0.1140]) 
-        # divide the value by 255
-        state = state / 255
+            # change only the target of the performed action
+            target = np.where(target == action, reward + self.gamma * next_q, target)
 
-        #set the same color for the road
-        state[(state > 0.411) & (state < 0.412)] = 0.4
-        state[(state > 0.419) & (state < 0.420)] = 0.4
+            states.append(state)
+            targets.append(target)
 
-        # plt.imshow(state, cmap='gray')
-        # plt.show()
-        # time.sleep(5)
-        return state
+        # train the model
+        self.model.fit(np.array(states), np.array(targets), epochs=1, verbose=0)
 
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
 
-    def save_best_solution(self, path = 'bestSolution/'):
-        self.basic_model.save(path + 'basic_model.h5')
-
-
-
-
+    def save_best_solution(self, path='bestSolution/'):
+        self.model.save(path + 'basic_model.h5')
