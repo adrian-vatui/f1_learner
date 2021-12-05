@@ -23,7 +23,7 @@ if __name__ == "__main__":
         while not done:
             if render:
                 env.render()
-            state = agent.preprocess(state) # preprocess the image - GrayScale
+            state = agent.preprocess(state) # preprocess the image - GrayScale/crop/etc
             action = agent.get_action(current_state) # get the action from the Neural network
             new_state, reward, done, info = env.step(action) # do the action
             agent.add_to_buffer(state, action, reward, new_state) # add the data to the memory Buffer
