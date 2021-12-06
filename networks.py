@@ -6,15 +6,15 @@ from keras.optimizers import Adam
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from keras.models import Sequential
 
-
 # util https://keras.io/examples/rl/ddpg_pendulum/
+import utils
 
 
 class BasicNetwork:
     def __init__(
             self,
             action_space=np.array([(0, 0, 0), (-1, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 0.8)]),
-            buffer_size=100,
+            buffer_size=10_000,
             gamma=0.95,
             epsilon=1.0,
             epsilon_min=0.1,
@@ -54,14 +54,17 @@ class BasicNetwork:
 
     def build_model(self, state_shape):
         model = Sequential()
-        model.add(Conv2D(filters=6, kernel_size=(7, 7), strides=(3, 3), activation='relu', input_shape=state_shape))
-        model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Conv2D(filters=12, kernel_size=(4, 4), strides=(1, 1), activation='relu'))
-        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Conv2D(filters=16, kernel_size=5, strides=4, padding="valid", activation='relu',
+                         input_shape=state_shape))
+        # model.add(MaxPooling2D(pool_size=(2, 2), padding="same"))
+        model.add(Conv2D(filters=32, kernel_size=3, strides=3, padding="valid", activation='relu'))
+        # model.add(MaxPooling2D(pool_size=(2, 2), padding="same"))
+        model.add(Conv2D(filters=32, kernel_size=3, strides=3, padding="valid", activation='relu'))
         model.add(Flatten())
-        model.add(Dense(216, activation='relu'))
+        model.add(Dense(64, activation='relu'))
         model.add(Dense(len(self.action_space), activation=None))
         model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss="mean_squared_error")
+        model.summary()
         return model
 
         # input = layers.Input(shape=state_shape)
@@ -111,13 +114,15 @@ class BasicNetwork:
     #     self.target_critic.set_weights(self.target_critic.get_weights())
 
     def get_action(self, state):
+        state = utils.preprocess(state)
+
         if self.model is None:
             self.model = self.build_model(state.shape)
 
         if np.random.rand() < self.epsilon:
             action_index = np.random.randint(0, len(self.action_space))
         else:
-            network_output = self.model.predict(state)
+            network_output = self.model.predict(np.expand_dims(state, axis=0))[0]
             action_index = np.argmax(network_output)
 
         return self.action_space[action_index]
@@ -133,6 +138,9 @@ class BasicNetwork:
         batch = random.sample(self.memory_buffer, self.batch_size)
         states, targets = [], []
         for state, action, reward, new_state in batch:
+            state = utils.preprocess(state)
+            new_state = utils.preprocess(new_state)
+
             # feed-forward the current state
             target = self.model.predict(np.expand_dims(state, axis=0))[0]
 
@@ -151,5 +159,8 @@ class BasicNetwork:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
-    def save_best_solution(self, path='bestSolution/'):
+    def save(self, path='bestSolution/'):
         self.model.save(path + 'basic_model.h5')
+
+    def load(self, path='bestSolution/'):
+        self.model.load_weights(path + 'basic_model.h5')

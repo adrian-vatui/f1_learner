@@ -1,7 +1,9 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import time
 
 
-def preprocess(state, greyscale=False):
+def preprocess(state, greyscale=True):
     # crop the image (Remove the bar below and 6 pixels from each margin)
     state = state[:-12, 6:-6]
 
@@ -16,7 +18,9 @@ def preprocess(state, greyscale=False):
         return state
 
     # convert to grayscale
-    np.dot(state[..., :3], [0.2989, 0.5870, 0.1140])
+    state = np.dot(state[..., :3], [0.2989, 0.5870, 0.1140])
+    state = np.expand_dims(state, axis=-1)
+
     # divide the value by 255
     state = state / 255
 
@@ -26,5 +30,5 @@ def preprocess(state, greyscale=False):
 
     # plt.imshow(state, cmap='gray')
     # plt.show()
-    # time.sleep(5)
+    # time.sleep(1)
     return state
