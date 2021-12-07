@@ -8,8 +8,8 @@ def preprocess(state, greyscale=True):
     state = state[:-12, 6:-6]
 
     # make the color of the car black
-    car_position = state[66:79, 36:47]
-    car_position[car_position == 204] = 0
+    # car_position = state[66:79, 36:47]
+    # car_position[car_position == 204] = 0
 
     # set the same color for the grass
     state = np.where(state == (102, 229, 102), (102, 204, 102), state)
