@@ -17,7 +17,7 @@ class DDPGActor:
     def __init__(
             self,
             buffer_size=10_000,
-            gamma=0.95,
+            gamma=0.99,
             batch_size=64,
             tau=0.005,
             noise_std=0.2
@@ -34,15 +34,16 @@ class DDPGActor:
         self.critic = None
         self.target_actor = None
         self.target_critic = None
-        self.actor_opt = Adam(0.001)
+        self.actor_opt = Adam(0.0001)
         self.critic_opt = Adam(0.002)
 
     def create_actor(self, state_shape):
         input = layers.Input(shape=state_shape)
         x = input
-        x = layers.Conv2D(16, kernel_size=(5, 5), strides=(4, 4), activation="relu", use_bias=False, padding="valid")(x)
-        x = layers.Conv2D(32, kernel_size=(3, 3), strides=(3, 3), padding='valid', use_bias=False, activation="relu")(x)
-        x = layers.Conv2D(32, kernel_size=(3, 3), strides=(3, 3), padding='valid', use_bias=False, activation="relu")(x)
+        x = layers.Conv2D(16, kernel_size=5, strides=3, activation="relu", use_bias=False, padding="valid")(x)
+        x = layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = layers.Conv2D(32, kernel_size=3, strides=1, padding='valid', use_bias=False, activation="relu")(x)
+        x = layers.MaxPooling2D(pool_size=(2, 2))(x)
 
         x = layers.Flatten()(x)
         x = layers.Dense(64, activation="relu")(x)
@@ -58,9 +59,10 @@ class DDPGActor:
         input = layers.Input(shape=state_shape)
         # analyze the input state(the image) using a convolutional neural network
         x = input
-        x = layers.Conv2D(16, kernel_size=(5, 5), strides=(4, 4), padding='valid', use_bias=False, activation="relu")(x)
-        x = layers.Conv2D(32, kernel_size=(3, 3), strides=(3, 3), padding='valid', use_bias=False, activation="relu")(x)
-        x = layers.Conv2D(32, kernel_size=(3, 3), strides=(3, 3), padding='valid', use_bias=False, activation="relu")(x)
+        x = layers.Conv2D(16, kernel_size=5, strides=3, activation="relu", use_bias=False, padding="valid")(x)
+        x = layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = layers.Conv2D(32, kernel_size=3, strides=1, padding='valid', use_bias=False, activation="relu")(x)
+        x = layers.MaxPooling2D(pool_size=(2, 2))(x)
 
         x = layers.Flatten()(x)
         actions_input = layers.Input(shape=(self.action_space_out,))
@@ -86,7 +88,7 @@ class DDPGActor:
         self.target_actor.set_weights(self.actor.get_weights())
         self.target_critic.set_weights(self.target_critic.get_weights())
 
-    def get_action(self, state):
+    def get_action(self, state, training=False):
         state = utils.preprocess(state)
 
         if self.actor is None:
@@ -94,14 +96,16 @@ class DDPGActor:
 
         # Get the action from the actor network
         state = tf.expand_dims(tf.convert_to_tensor(state), 0)
-        model_out = self.actor(state).numpy()
+        model_out = self.actor(state, training=training).numpy()
 
         model_out = model_out[0]
         network_action = model_out
 
         # print(model_out)
         # steer & gas or break
-        model_out = np.array([model_out[0], max(model_out[1], 0), max(-model_out[1], 0)])
+        model_out = np.array([np.clip(model_out[0], a_min=-1, a_max=1),
+                              np.clip(model_out[1], a_min=0, a_max=1),
+                              -np.clip(model_out[1], a_min=-1, a_max=0)])
 
         return model_out / 3, network_action
 

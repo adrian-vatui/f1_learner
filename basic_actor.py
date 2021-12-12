@@ -53,7 +53,7 @@ class BasicActor:
         model.summary()
         return model
 
-    def get_action(self, state):
+    def get_action(self, state, training=False):
         state = utils.preprocess(state)
 
         if self.model is None:

@@ -25,7 +25,7 @@ if __name__ == "__main__":
         while not done:
             if RENDER:
                 env.render()
-            action, network_output = agent.get_action(state)  # get the action from the Neural network
+            action, network_output = agent.get_action(state, training=True)  # get the action from the Neural network
             new_state, reward, done, info = env.step(action)  # execute the action
             agent.add_to_buffer(state, network_output, reward, new_state)  # add the data to the memory Buffer
             agent.train()  # and train the networks with the new data added in the memory buffer
