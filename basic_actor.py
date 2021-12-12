@@ -1,4 +1,5 @@
 import random
+import sys
 from collections import deque
 
 import keras.models
@@ -6,12 +7,13 @@ import numpy as np
 from keras.layers import Conv2D, Flatten, Dense
 from keras.models import Sequential
 from keras.optimizers import Adam
+from tensorflow.python.keras.layers import MaxPooling2D
 
 import utils
 
 
 # util https://keras.io/examples/rl/ddpg_pendulum/
-
+# notite: functia de cost = -output critic
 
 class BasicActor:
     def __init__(
@@ -20,8 +22,8 @@ class BasicActor:
             buffer_size=10_000,
             gamma=0.95,
             epsilon=1.0,
-            epsilon_min=0.1,
-            epsilon_decay=0.9999,
+            epsilon_min=0.01,
+            epsilon_decay=0.999,
             learning_rate=0.001,
             batch_size=64
     ):
@@ -39,14 +41,13 @@ class BasicActor:
 
     def build_model(self, state_shape):
         model = Sequential()
-        model.add(Conv2D(filters=16, kernel_size=5, strides=4, padding="valid", activation='relu',
+        model.add(Conv2D(filters=16, kernel_size=5, strides=3, padding="valid", activation='relu',
                          input_shape=state_shape))
-        # model.add(MaxPooling2D(pool_size=(2, 2), padding="same"))
-        model.add(Conv2D(filters=32, kernel_size=3, strides=3, padding="valid", activation='relu'))
-        # model.add(MaxPooling2D(pool_size=(2, 2), padding="same"))
-        model.add(Conv2D(filters=32, kernel_size=3, strides=3, padding="valid", activation='relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Conv2D(filters=32, kernel_size=3, strides=1, padding="valid", activation='relu'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
-        model.add(Dense(64, activation='relu'))
+        model.add(Dense(32, activation='relu'))
         model.add(Dense(len(self.action_space), activation=None))
         model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss="mean_squared_error")
         model.summary()
@@ -93,7 +94,7 @@ class BasicActor:
         targets = np.array(targets)
 
         # train the model
-        self.model.fit(states, targets, epochs=1, verbose=0)
+        self.model.fit(states, targets, epochs=1, verbose=0, batch_size=self.batch_size)
 
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay

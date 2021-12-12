@@ -16,26 +16,20 @@ import utils
 class DDPGActor:
     def __init__(
             self,
-            action_space=np.array([(0, 0, 0), (-1, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 0.8)]),
             buffer_size=10_000,
             gamma=0.95,
             batch_size=64,
             tau=0.005,
-            epsilon=1.0,
-            epsilon_min=0.1,
-            epsilon_decay=0.9999,
+            noise_std=0.2
     ):
+        self.noise_std = noise_std
         self.tau = tau
-        self.action_space = action_space
         self.action_space_out = 2
         self.buffer_size = buffer_size
         self.gamma = gamma
         self.batch_size = batch_size
-        self.epsilon = epsilon
-        self.epsilon_decay = epsilon_decay
-        self.epsilon_min = epsilon_min
 
-        self.memory_buffer = deque(maxlen=self.buffer_size)
+        self.memory_buffer = utils.Buffer(capacity=self.buffer_size)
         self.actor = None
         self.critic = None
         self.target_actor = None
@@ -47,11 +41,12 @@ class DDPGActor:
         input = layers.Input(shape=state_shape)
         x = input
         x = layers.Conv2D(16, kernel_size=(5, 5), strides=(4, 4), activation="relu", use_bias=False, padding="valid")(x)
-        x = layers.Conv2D(32, kernel_size=(4, 4), strides=(4, 4), activation="relu", use_bias=False, padding="valid")(x)
-        x = layers.Conv2D(32, kernel_size=(4, 4), strides=(4, 4), activation="relu", use_bias=False, padding="valid")(x)
+        x = layers.Conv2D(32, kernel_size=(3, 3), strides=(3, 3), padding='valid', use_bias=False, activation="relu")(x)
+        x = layers.Conv2D(32, kernel_size=(3, 3), strides=(3, 3), padding='valid', use_bias=False, activation="relu")(x)
 
         x = layers.Flatten()(x)
         x = layers.Dense(64, activation="relu")(x)
+        x = layers.GaussianNoise(self.noise_std)(x)
         # output is one of the possible actions
         y = layers.Dense(self.action_space_out, activation='tanh')(x)
 
@@ -63,16 +58,16 @@ class DDPGActor:
         input = layers.Input(shape=state_shape)
         # analyze the input state(the image) using a convolutional neural network
         x = input
-        x = layers.Conv2D(16, kernel_size=(5, 5), strides=(4, 4), activation="relu", use_bias=False, padding="valid")(x)
-        x = layers.Conv2D(32, kernel_size=(4, 4), strides=(4, 4), activation="relu", use_bias=False, padding="valid")(x)
-        x = layers.Conv2D(32, kernel_size=(4, 4), strides=(4, 4), activation="relu", use_bias=False, padding="valid")(x)
+        x = layers.Conv2D(16, kernel_size=(5, 5), strides=(4, 4), padding='valid', use_bias=False, activation="relu")(x)
+        x = layers.Conv2D(32, kernel_size=(3, 3), strides=(3, 3), padding='valid', use_bias=False, activation="relu")(x)
+        x = layers.Conv2D(32, kernel_size=(3, 3), strides=(3, 3), padding='valid', use_bias=False, activation="relu")(x)
 
         x = layers.Flatten()(x)
         actions_input = layers.Input(shape=(self.action_space_out,))
         # combine the output after analyzing the input state(the image) with the possible actions, to get a reward..
         x = layers.concatenate([x, actions_input])
         x = layers.Dense(64, activation="relu")(x)
-        x = layers.Dense(64, activation="relu")(x)
+        x = layers.Dense(32, activation="relu")(x)
         y = layers.Dense(1)(x)
 
         model = Model(inputs=[input, actions_input], outputs=y)
@@ -104,38 +99,29 @@ class DDPGActor:
         model_out = model_out[0]
         network_action = model_out
 
-        if np.random.rand() < self.epsilon:
-            model_out = np.array(random.choice([(0, 0, 0), (-1, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 0.8)]))
-            network_action = [model_out[0], model_out[1] - model_out[2]]
-        else:
-            # print(model_out)
-            # steer & gas or break
-            model_out = np.array([model_out[0], max(model_out[1], 0), max(-model_out[1], 0)])
+        # print(model_out)
+        # steer & gas or break
+        model_out = np.array([model_out[0], max(model_out[1], 0), max(-model_out[1], 0)])
 
         return model_out / 3, network_action
 
     def add_to_buffer(self, state, action, reward, new_state):
-        self.memory_buffer.append((utils.preprocess(state), action, reward, utils.preprocess(new_state)))
+        self.memory_buffer.add(utils.preprocess(state), action, reward, utils.preprocess(new_state))
 
     def train(self):
-        if len(self.memory_buffer) >= self.batch_size:
-            state_batch, action_batch, reward_batch, new_state_batch = zip(
-                *random.sample(self.memory_buffer, self.batch_size))
+        state_batch, action_batch, reward_batch, new_state_batch = self.memory_buffer.sample(self.batch_size)
 
-            state_batch = tf.convert_to_tensor(np.array(state_batch))
-            action_batch = tf.convert_to_tensor(np.array(action_batch))
-            reward_batch = tf.convert_to_tensor(np.array(reward_batch))
-            reward_batch = tf.cast(reward_batch, dtype=tf.float32)
-            new_state_batch = tf.convert_to_tensor(np.array(new_state_batch))
+        state_batch = tf.convert_to_tensor(np.array(state_batch))
+        action_batch = tf.convert_to_tensor(np.array(action_batch))
+        reward_batch = tf.convert_to_tensor(np.array(reward_batch))
+        reward_batch = tf.cast(reward_batch, dtype=tf.float32)
+        new_state_batch = tf.convert_to_tensor(np.array(new_state_batch))
 
-            self.update_actor_critic(state_batch, action_batch, reward_batch, new_state_batch)
+        self.update_actor_critic(state_batch, action_batch, reward_batch, new_state_batch)
 
-            # Update target networks
-            self.update_target_network(self.target_actor.variables, self.actor.variables)
-            self.update_target_network(self.target_critic.variables, self.critic.variables)
-
-            if self.epsilon > self.epsilon_min:
-                self.epsilon = self.epsilon * self.epsilon_decay
+        # Update target networks
+        self.update_target_network(self.target_actor.variables, self.actor.variables)
+        self.update_target_network(self.target_critic.variables, self.critic.variables)
 
     @tf.function
     def update_actor_critic(self, state, action, reward, new_state):
@@ -160,8 +146,8 @@ class DDPGActor:
 
     @tf.function
     def update_target_network(self, target_weights, weights):
-        for a, b in zip(target_weights, weights):
-            a.assign(b * self.tau + a * (1 - self.tau))
+        for weight, target_weight in zip(weights, target_weights):
+            target_weight.assign(weight * self.tau + target_weight * (1 - self.tau))
 
     def save(self, path='bestSolution/'):
         self.actor.save(path + 'actor.h5')

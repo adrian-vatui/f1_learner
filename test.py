@@ -5,8 +5,8 @@ from ddpg_actor import DDPGActor
 
 if __name__ == '__main__':
     env = gym.make('CarRacing-v0')
-    # agent = BasicActor(epsilon=0.01)
-    agent = DDPGActor(epsilon=0.01)
+    agent = BasicActor()
+    # agent = DDPGActor()
     agent.load()
 
     while True:

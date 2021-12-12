@@ -8,8 +8,8 @@ RENDER = True
 
 if __name__ == "__main__":
     env = gym.make('CarRacing-v0')
-    agent = BasicActor(buffer_size=10_000, batch_size=64)
-    # agent = DDPGActor(buffer_size=1_000)
+    # agent = BasicActor(buffer_size=10_000, batch_size=64)
+    agent = DDPGActor(buffer_size=10_000)
     best_reward = -9999
 
     for i_episode in range(episodes_num):
@@ -17,6 +17,10 @@ if __name__ == "__main__":
         done = False
         total_reward = 0
         negative_counter = 0
+
+        # skip the first 40 frames when the zooming happens
+        for i in range(40):
+            state, _, _, _ = env.step([0, 0, 0])
 
         while not done:
             if RENDER:
@@ -26,6 +30,8 @@ if __name__ == "__main__":
             agent.add_to_buffer(state, network_output, reward, new_state)  # add the data to the memory Buffer
             agent.train()  # and train the networks with the new data added in the memory buffer
 
+            # frame skips by performing the action again?
+
             total_reward += reward
             state = new_state
 
@@ -33,7 +39,7 @@ if __name__ == "__main__":
                 negative_counter += 1
             else:
                 negative_counter = 0
-            if negative_counter > 150:  # abandon the episode if I get negative rewards for 100 consecutive frames
+            if negative_counter > 150:  # abandon the episode if I get negative rewards for too many consecutive frames
                 break
 
         if total_reward > best_reward:  # save the best solution
