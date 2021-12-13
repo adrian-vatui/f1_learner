@@ -7,7 +7,7 @@ episodes_num = 10_000
 RENDER = True
 
 if __name__ == "__main__":
-    env = gym.make('CarRacing-v0')
+    env = gym.make('CarRacing-v0', verbose=0)
     # agent = BasicActor(buffer_size=10_000, batch_size=64)
     agent = DDPGActor(buffer_size=10_000)
     best_reward = -9999
@@ -45,3 +45,5 @@ if __name__ == "__main__":
         if total_reward > best_reward:  # save the best solution
             agent.save()
             best_reward = total_reward
+
+        print(f"[training] Finished episode {i_episode + 1} with reward {total_reward}")

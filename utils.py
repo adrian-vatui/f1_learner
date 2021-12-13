@@ -38,6 +38,40 @@ def preprocess(state, greyscale=True):
     return state
 
 
+def extract_features(state):
+    # "metrics" part of the image starts at row 84 (inclusive)
+
+    # speed: [93, 12:14] - [84, 12:14]
+    speed = np.count_nonzero(np.mean(state[84:94, 12], axis=1))
+
+    # all abs: [93, 17:26] - [84, 17:26]
+    # abs1 and 2: [93, 17:22] - [84, 17:22]
+    # abs1: [93, 17:19] - [84, 17:19]
+    abs1 = np.count_nonzero(np.mean(state[84:94, 17], axis=1))
+
+    # abs2: [93, 19:22] - [84, 19:22]
+    abs2 = np.count_nonzero(np.mean(state[84:94, 19], axis=1))
+
+    # abs3 and 4: [93, 22:26] - [84, 22:26]
+    # abs3: [93, 22:24] - [84, 22:24]
+    abs3 = np.count_nonzero(np.mean(state[84:94, 22], axis=1))
+
+    # abs4: [93, 24:26] - [84, 24:26]
+    abs4 = np.count_nonzero(np.mean(state[84:94, 24], axis=1))
+
+    # steering: left: ? - 47, right: 48 - ?
+    steering_left = np.count_nonzero(np.all(state[90][:48] == [0, 255, 0], axis=1))
+    steering_right = np.count_nonzero(np.all(state[90][48:] == [0, 255, 0], axis=1))
+    steering = -steering_left if steering_left > steering_right else steering_right
+
+    # gyroscope: left: ? - 71, right: 72 - ?
+    gyroscope_left = np.count_nonzero(np.all(state[90][:72] == [255, 0, 0], axis=1))
+    gyroscope_right = np.count_nonzero(np.all(state[90][72:] == [255, 0, 0], axis=1))
+    gyroscope = -gyroscope_left if gyroscope_left > gyroscope_right else gyroscope_right
+
+    return speed, abs1, abs2, abs3, abs4, steering, gyroscope
+
+
 class Buffer:
     """
     Class for maintaining a history of visited states. Implemented like this instead of using (de)queues because

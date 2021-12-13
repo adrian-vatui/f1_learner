@@ -22,11 +22,11 @@ class DDPGActor:
             tau=0.005,
             noise_std=0.2
     ):
-        self.noise_std = noise_std
-        self.tau = tau
-        self.action_space_out = 2
+        self.noise_std = noise_std  # amount of noise added to network output in training
+        self.tau = tau  # rate at which new actor/critic weights are applied to target actor/critic weights
+        self.action_space_out = 2  # size of the output layer of the actor network
         self.buffer_size = buffer_size
-        self.gamma = gamma
+        self.gamma = gamma  # how important future rewards are vs. the current reward
         self.batch_size = batch_size
 
         self.memory_buffer = utils.Buffer(capacity=self.buffer_size)
@@ -67,8 +67,8 @@ class DDPGActor:
         x = layers.Flatten()(x)
         actions_input = layers.Input(shape=(self.action_space_out,))
         # combine the output after analyzing the input state(the image) with the possible actions, to get a reward..
-        x = layers.concatenate([x, actions_input])
         x = layers.Dense(64, activation="relu")(x)
+        x = layers.concatenate([x, actions_input])
         x = layers.Dense(32, activation="relu")(x)
         y = layers.Dense(1)(x)
 
