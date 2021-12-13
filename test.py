@@ -23,6 +23,8 @@ if __name__ == '__main__':
             state = new_state
             episode_reward += reward
 
+        total_reward += episode_reward
+
         print(f"[testing] Finished episode {i_episode + 1} with reward {episode_reward}")
 
     print("Average reward:", total_reward / episodes_num)
