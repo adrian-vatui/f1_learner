@@ -108,7 +108,7 @@ class DDPGActor:
                               -np.clip(model_out[1], a_min=-1, a_max=0)])
 
         model_out[1] /= 1.25 # decrease speed even more
-        return model_out / 3, network_action
+        return model_out/4, network_action
 
     def add_to_buffer(self, state, action, reward, new_state):
         self.memory_buffer.add(utils.preprocess(state), action, reward, utils.preprocess(new_state))

@@ -2,16 +2,18 @@ import gym
 
 from basic_actor import BasicActor
 from ddpg_actor import DDPGActor
+import numpy as np
 
 episodes_num = 10_000
-RENDER = True
+RENDER = False
 SKIP_FRAMES = 2
 
 if __name__ == "__main__":
     env = gym.make('CarRacing-v0', verbose=0)
     # agent = BasicActor(buffer_size=10_000, batch_size=64)
-    agent = DDPGActor(buffer_size=20_000)
+    agent = DDPGActor(buffer_size=30_000)
     best_reward = -9999
+    last_10_reward = np.zeros(10)
 
     for i_episode in range(episodes_num):
         state = env.reset()
@@ -25,7 +27,7 @@ if __name__ == "__main__":
         for i in range(40):
             state, _, _, _ = env.step([0, 0, 0])
         
-        
+        last_episodes_max_rewatd = np.amax(last_10_reward)
 
         while not done:
             if RENDER:
@@ -33,15 +35,14 @@ if __name__ == "__main__":
 
             skipped_frames += 1
             if skipped_frames == 1: 
-                action, network_output = agent.get_action(state, training=True)  # get the action from the Neural network
+                if last_episodes_max_rewatd > 800: # if the score is good, remove the noise for 10 episodes
+                    action, network_output = agent.get_action(state, training=False)  # get the action from the Neural network
+                else:
+                    action, network_output = agent.get_action(state, training=True)  # get the action from the Neural network
                 state_before_skip = state
             
             new_state, reward, done, info = env.step(action)  # execute the action
 
-            #total_reward += reward
-
-            # if reward < 0:
-            #     reward *=2 # Increase negative reward for stepping on the grass
             skipped_frames_reward += reward
 
             if skipped_frames == SKIP_FRAMES: 
@@ -60,6 +61,7 @@ if __name__ == "__main__":
             if negative_counter > 150:  # abandon the episode if I get negative rewards for too many consecutive frames
                 break
 
+        last_10_reward[i_episode%10] = total_reward
         if total_reward > best_reward:  # save the best solution
             agent.save()
             best_reward = total_reward

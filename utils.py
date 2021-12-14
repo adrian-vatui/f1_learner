@@ -10,11 +10,6 @@ def preprocess(state, greyscale=True):
     for i in range(88, 93 + 1):
         state[i, 0:12, :] = state[i, 12, :]
 
-    # Make the car black
-    car_color = 68.0
-    car_area = state[67:77, 42:53]
-    car_area[car_area == car_color] = 0
-
     # set the same color for the grass
     state = np.where(state == (102, 229, 102), (102, 204, 102), state)
 
@@ -28,7 +23,7 @@ def preprocess(state, greyscale=True):
     # divide the value by 255
     state = state / 255
 
-    # set the same color for the road
+   # set the same color for the road
     # state[(state > 0.411) & (state < 0.412)] = 0.4
     # state[(state > 0.419) & (state < 0.420)] = 0.4
 
