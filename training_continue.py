@@ -5,14 +5,14 @@ from ddpg_actor import DDPGActor
 import numpy as np
 
 episodes_num = 10_000
-RENDER = False
+RENDER = True
 SKIP_FRAMES = 2
 
 if __name__ == "__main__":
     env = gym.make('CarRacing-v0', verbose=0)
-    # agent = BasicActor(buffer_size=10_000, batch_size=64)
     agent = DDPGActor(buffer_size=30_000)
-    best_reward = -9999
+    agent.load()
+    best_reward = 800
     last_10_reward = np.zeros(10)
 
     for i_episode in range(episodes_num):
@@ -35,10 +35,7 @@ if __name__ == "__main__":
 
             skipped_frames += 1
             if skipped_frames == 1: 
-                if last_episodes_max_rewatd > 800: # if the score is good, remove the noise for 10 episodes
-                    action, network_output = agent.get_action(state, training=False)  # get the action from the Neural network
-                else:
-                    action, network_output = agent.get_action(state, training=True)  # get the action from the Neural network
+                action, network_output = agent.get_action(state, training=False)  # get the action from the Neural network
                 state_before_skip = state
             
             new_state, reward, done, info = env.step(action)  # execute the action
@@ -62,8 +59,9 @@ if __name__ == "__main__":
                 break
 
         last_10_reward[i_episode%10] = total_reward
-        if np.average(last_10_reward) >= total_reward * 0.75 and total_reward > best_reward:  # save the best solution
-            agent.save(path='bestConfig2/')
+        if np.average(last_10_reward) >= best_reward and total_reward > best_reward:  # save the best solution
+            #agent.save(path='bestExploited/')
+            agent.save()
             best_reward = total_reward
 
-        print(f"[training] Finished episode {i_episode + 1} with reward {total_reward}, and best reward={best_reward}")
+        print(f"[training] Finished episode {i_episode + 1} with reward {total_reward}")
