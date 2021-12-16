@@ -7,7 +7,7 @@ if __name__ == '__main__':
     env = gym.make('CarRacing-v0', verbose=0)
     # agent = BasicActor()
     agent = DDPGActor()
-    agent.load(path='bestConfig2/')
+    agent.load()
     total_reward = 0
     episodes_num = 30
 

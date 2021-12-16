@@ -6,7 +6,7 @@ import time
 def preprocess(state, greyscale=True):
     state = state.copy()  # making a copy so the image used in the function call doesn't get modified
 
-    # Remove numbers and enlarge speed bar
+    # Remove score numbers and enlarge speed bar
     for i in range(88, 93 + 1):
         state[i, 0:12, :] = state[i, 12, :]
 
@@ -20,10 +20,10 @@ def preprocess(state, greyscale=True):
     state = np.dot(state[..., :3], [0.2989, 0.5870, 0.1140])
     state = np.expand_dims(state, axis=-1)
 
-    # divide the value by 255
+    # normalize values to 0..1
     state = state / 255
 
-   # set the same color for the road
+    # set the same color for the road
     # state[(state > 0.411) & (state < 0.412)] = 0.4
     # state[(state > 0.419) & (state < 0.420)] = 0.4
 

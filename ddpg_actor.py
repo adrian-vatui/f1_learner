@@ -1,17 +1,15 @@
-import random
-from collections import deque
-
 import keras.models
 import tensorflow as tf
 import numpy as np
 from keras import layers
 from keras.optimizers import Adam
 
-# util https://keras.io/examples/rl/ddpg_pendulum/
 from tensorflow.python.keras import Model
 
 import utils
 
+
+# util https://keras.io/examples/rl/ddpg_pendulum/
 
 class DDPGActor:
     def __init__(
@@ -107,8 +105,8 @@ class DDPGActor:
                               np.clip(model_out[1], a_min=0, a_max=1),
                               -np.clip(model_out[1], a_min=-1, a_max=0)])
 
-        model_out[1] /= 1.5 # decrease speed even more
-        return model_out/4, network_action
+        model_out[1] /= 1.25  # decrease speed even more
+        return model_out / 4, network_action
 
     def add_to_buffer(self, state, action, reward, new_state):
         self.memory_buffer.add(utils.preprocess(state), action, reward, utils.preprocess(new_state))
