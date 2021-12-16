@@ -47,11 +47,17 @@ class DDPGActor:
 
         x = layers.Flatten()(x)
         x = layers.Dense(64, activation="relu")(x)
+
+        features = layers.Input(shape=(7,))  # other features extracted from the image
+        x = layers.concatenate([x, features])
+        x = layers.Dense(64, activation="relu")(x)
+
         x = layers.GaussianNoise(self.noise_std)(x)
+
         # output is one of the possible actions
         y = layers.Dense(self.action_space_out, activation='tanh')(x)
 
-        model = Model(inputs=input, outputs=y, name="Actor")
+        model = Model(inputs=[input, features], outputs=y, name="Actor")
         model.summary()
         return model
 
@@ -65,14 +71,20 @@ class DDPGActor:
         x = layers.MaxPooling2D(pool_size=(2, 2))(x)
 
         x = layers.Flatten()(x)
-        actions_input = layers.Input(shape=(self.action_space_out,))
-        # combine the output after analyzing the input state(the image) with the possible actions, to get a reward..
         x = layers.Dense(64, activation="relu")(x)
+
+        features = layers.Input(shape=(7,))  # other features extracted from the image
+        x = layers.concatenate([x, features])
+        x = layers.Dense(64, activation="relu")(x)
+
+        # combine the output after analyzing the input state(the image) with the possible actions, to get a reward..
+        actions_input = layers.Input(shape=(self.action_space_out,))
         x = layers.concatenate([x, actions_input])
         x = layers.Dense(32, activation="relu")(x)
+
         y = layers.Dense(1)(x)
 
-        model = Model(inputs=[input, actions_input], outputs=y)
+        model = Model(inputs=[input, features, actions_input], outputs=y)
         model.summary()
         return model
 
@@ -89,6 +101,7 @@ class DDPGActor:
         self.target_critic.set_weights(self.target_critic.get_weights())
 
     def get_action(self, state, training=False):
+        extra_features = utils.extract_features(state)
         state = utils.preprocess(state)
 
         if self.actor is None:
@@ -96,7 +109,8 @@ class DDPGActor:
 
         # Get the action from the actor network
         state = tf.expand_dims(tf.convert_to_tensor(state), 0)
-        model_out = self.actor(state, training=training).numpy()
+        extra_features = tf.expand_dims(tf.convert_to_tensor(extra_features), 0)
+        model_out = self.actor([state, extra_features], training=training).numpy()
 
         model_out = model_out[0]
         network_action = model_out
@@ -110,31 +124,36 @@ class DDPGActor:
         return model_out / 3, network_action
 
     def add_to_buffer(self, state, action, reward, new_state):
-        self.memory_buffer.add(utils.preprocess(state), action, reward, utils.preprocess(new_state))
+        self.memory_buffer.add(utils.preprocess(state), action, reward, utils.preprocess(new_state),
+                               utils.extract_features(state), utils.extract_features(new_state))
 
     def train(self):
-        state_batch, action_batch, reward_batch, new_state_batch = self.memory_buffer.sample(self.batch_size)
+        state_batch, action_batch, reward_batch, new_state_batch, extra_features_batch, new_extra_features_batch = \
+            self.memory_buffer.sample(self.batch_size)
 
         state_batch = tf.convert_to_tensor(np.array(state_batch))
         action_batch = tf.convert_to_tensor(np.array(action_batch))
         reward_batch = tf.convert_to_tensor(np.array(reward_batch))
         reward_batch = tf.cast(reward_batch, dtype=tf.float32)
         new_state_batch = tf.convert_to_tensor(np.array(new_state_batch))
+        extra_features_batch = tf.convert_to_tensor(np.array(extra_features_batch))
+        new_extra_features_batch = tf.convert_to_tensor(np.array(new_extra_features_batch))
 
-        self.update_actor_critic(state_batch, action_batch, reward_batch, new_state_batch)
+        self.update_actor_critic(state_batch, action_batch, reward_batch, new_state_batch,
+                                 extra_features_batch, new_extra_features_batch)
 
         # Update target networks
         self.update_target_network(self.target_actor.variables, self.actor.variables)
         self.update_target_network(self.target_critic.variables, self.critic.variables)
 
     @tf.function
-    def update_actor_critic(self, state, action, reward, new_state):
+    def update_actor_critic(self, state, action, reward, new_state, extra_features, new_extra_features):
         # Update critic
         with tf.GradientTape() as tape:
-            new_action = self.target_actor(new_state, training=True)
-            y = reward + self.gamma * self.target_critic([new_state, new_action], training=True)
+            new_action = self.target_actor([new_state, new_extra_features], training=True)
+            y = reward + self.gamma * self.target_critic([new_state, new_extra_features, new_action], training=True)
 
-            critic_value = self.critic([state, action], training=True)
+            critic_value = self.critic([state, extra_features, action], training=True)
             critic_loss = tf.math.reduce_mean(tf.square(y - critic_value))
 
         critic_gradients = tape.gradient(critic_loss, self.critic.trainable_variables)
@@ -142,7 +161,8 @@ class DDPGActor:
 
         # Update actor
         with tf.GradientTape() as tape:
-            critic_out = self.critic([state, self.actor(state, training=True)], training=True)
+            critic_out = self.critic([state, extra_features, self.actor([state, extra_features], training=True)],
+                                     training=True)
             actor_loss = -tf.math.reduce_mean(critic_out)
 
         actor_gradients = tape.gradient(actor_loss, self.actor.trainable_variables)

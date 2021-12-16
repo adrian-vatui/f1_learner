@@ -16,6 +16,10 @@ if __name__ == '__main__':
         done = False
         episode_reward = 0
 
+        # skip the first 40 frames when the zooming happens
+        for i in range(40):
+            state, _, _, _ = env.step([0, 0, 0])
+
         while not done:
             env.render()
             action, network_output = agent.get_action(state, training=False)  # get the action from the Neural network
@@ -24,6 +28,7 @@ if __name__ == '__main__':
             episode_reward += reward
 
         print(f"[testing] Finished episode {i_episode + 1} with reward {episode_reward}")
+        total_reward += episode_reward
 
     print("Average reward:", total_reward / episodes_num)
 # python C:\ProgramData\Anaconda3\envs\f1_learner\Lib\site-packages\gym\envs\box2d\car_racing.py

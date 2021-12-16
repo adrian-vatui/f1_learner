@@ -2,6 +2,7 @@ import gym
 
 from basic_actor import BasicActor
 from ddpg_actor import DDPGActor
+import numpy as np
 
 episodes_num = 10_000
 RENDER = True
@@ -11,6 +12,7 @@ if __name__ == "__main__":
     # agent = BasicActor(buffer_size=10_000, batch_size=64)
     agent = DDPGActor(buffer_size=10_000)
     best_reward = -9999
+    last_10_reward = np.zeros(10)
 
     for i_episode in range(episodes_num):
         state = env.reset()
@@ -42,8 +44,9 @@ if __name__ == "__main__":
             if negative_counter > 150:  # abandon the episode if I get negative rewards for too many consecutive frames
                 break
 
-        if total_reward > best_reward:  # save the best solution
+        last_10_reward[i_episode % 10] = total_reward
+        if np.average(last_10_reward) > best_reward:  # save the best solution
             agent.save()
-            best_reward = total_reward
+            best_reward = np.average(last_10_reward)
 
         print(f"[training] Finished episode {i_episode + 1} with reward {total_reward}")
