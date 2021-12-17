@@ -6,7 +6,7 @@
 
 We started out by trying a simple Q-learning solution that only used one network to approximate the Q-value and decide
 between 5 discrete actions (do nothing, left, right, accelerate, break). The agent however did not perform that well,
-only obtaining a score of around
+not even getting a positive score.
 
 We then moved on to another approach - Deep Deterministic Policy Gradient. This solution uses 4 networks (actor, critic
 and one target network for each) in order to learn on-policy and output actions in a continuous search space. We learned
