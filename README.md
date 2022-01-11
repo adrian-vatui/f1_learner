@@ -53,8 +53,9 @@ between 5 discrete actions (do nothing, left, right, accelerate, break). The age
 not even getting a positive score.
 
 We then moved on to another approach - Deep Deterministic Policy Gradient. This solution uses 4 networks (actor, critic
-and one target network for each) in order to learn on-policy and output actions in a continuous search space. We learned
-a lot about the algorithm and took inspiration from [here](https://spinningup.openai.com/en/latest/algorithms/ddpg.html)
+and one target network for each) in order to learn off-policy and output actions in a continuous search space. We
+learned a lot about the algorithm and took inspiration
+from [here](https://spinningup.openai.com/en/latest/algorithms/ddpg.html)
 and [here](https://keras.io/examples/rl/ddpg_pendulum/).
 
 ### Results
