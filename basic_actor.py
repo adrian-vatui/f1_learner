@@ -59,7 +59,7 @@ class BasicActor:
         if self.model is None:
             self.model = self.build_model(state.shape)
 
-        if np.random.rand() < self.epsilon:
+        if training and np.random.rand() < self.epsilon:
             action_index = np.random.randint(0, len(self.action_space))
         else:
             network_output = self.model.predict(np.expand_dims(state, axis=0))[0]
